@@ -3,7 +3,7 @@
   "name": "Prompt QA Copilot",
   "description": "Minimal prompt formatter for AI chats.",
   "version": "0.1.1",
-  "permissions": [],
+  "permissions": ["storage"],
   "host_permissions": [
     "https://chat.openai.com/*",
     "https://chatgpt.com/*",
