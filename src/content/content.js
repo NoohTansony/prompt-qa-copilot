@@ -1,8 +1,92 @@
 (function () {
-  const script = document.createElement("script");
-  script.src = chrome.runtime.getURL("src/core/promptAnalyzer.js");
-  script.onload = () => script.remove();
-  (document.head || document.documentElement).appendChild(script);
+  const Analyzer = {
+    scorePrompt(text) {
+      const input = String(text || "");
+      if (!input.trim()) {
+        return { score: 0, missing: ["role", "goal", "constraints", "output_format"], notes: ["Prompt is empty."] };
+      }
+
+      const lower = input.toLowerCase();
+      const checks = [
+        { key: "role", test: /you are|act as|role:/i },
+        { key: "goal", test: /goal|objective|task|i need/i },
+        { key: "constraints", test: /constraint|must|should|do not|avoid/i },
+        { key: "output_format", test: /format|json|table|bullet|markdown|schema/i },
+      ];
+      const missing = checks.filter((c) => !c.test.test(lower)).map((c) => c.key);
+
+      let score = 40;
+      score += Math.min(input.length / 20, 20);
+      score += (4 - missing.length) * 10;
+      if (input.split("\n").length >= 3) score += 5;
+      if (/example|for instance|e\.g\./i.test(input)) score += 5;
+      score = Math.max(0, Math.min(100, Math.round(score)));
+
+      const notes = [];
+      if (missing.includes("role")) notes.push("Add a role (e.g., 'You are a senior...').");
+      if (missing.includes("goal")) notes.push("State one clear task goal.");
+      if (missing.includes("constraints")) notes.push("Add constraints (tone, length, forbidden actions).");
+      if (missing.includes("output_format")) notes.push("Specify output format (bullets, JSON, sections).");
+
+      return { score, missing, notes };
+    },
+    rewritePrompt(text, mode = "concise") {
+      const trimmed = String(text || "").trim();
+      if (!trimmed) return "";
+      const prefix =
+        mode === "coder"
+          ? "You are a senior software engineer."
+          : mode === "detailed"
+          ? "You are an expert assistant. Think step by step and be explicit."
+          : "You are a helpful assistant.";
+
+      return [
+        prefix,
+        "",
+        "Task:",
+        trimmed,
+        "",
+        "Constraints:",
+        "- Be accurate and practical.",
+        "- Ask clarifying questions only if critical information is missing.",
+        mode === "concise" ? "- Keep the response concise." : "- Include actionable details.",
+        "",
+        "Output format:",
+        "- Summary",
+        "- Key points",
+        "- Next steps",
+      ].join("\n");
+    },
+    refinePrompt(text, context = {}, mode = "concise") {
+      const trimmed = String(text || "").trim();
+      if (!trimmed) return "";
+      const prefix =
+        mode === "coder"
+          ? "You are a senior software engineer."
+          : mode === "detailed"
+          ? "You are an expert assistant. Think step by step and be explicit."
+          : "You are a helpful assistant.";
+
+      return [
+        prefix,
+        "",
+        "Primary Goal:",
+        context.goal || "Complete the user's request accurately.",
+        "",
+        "User Input:",
+        trimmed,
+        "",
+        "Tone:",
+        context.tone || "Clear and professional",
+        "",
+        "Constraints:",
+        context.constraints || "No hallucinations. Be explicit when uncertain.",
+        "",
+        "Required Output Format:",
+        context.outputFormat || "Bullet list with concise steps.",
+      ].join("\n");
+    },
+  };
 
   const DAILY_FREE_LIMIT = 20;
   const HISTORY_KEY = "promptHistory";
@@ -299,9 +383,9 @@
 
   function analyze() {
     activeInput = getMainInput();
-    if (!activeInput || !window.PromptAnalyzer) return;
+    if (!activeInput) return;
 
-    const result = window.PromptAnalyzer.scorePrompt(readInputValue(activeInput));
+    const result = Analyzer.scorePrompt(readInputValue(activeInput));
     panel.querySelector("#pqc-score").textContent = `${result.score}/100`;
 
     const notesEl = panel.querySelector("#pqc-notes");
@@ -360,17 +444,12 @@
   function improve() {
     activeInput = getMainInput();
     if (!activeInput) return;
-    if (!window.PromptAnalyzer) {
-      panel.querySelector("#pqc-notes").innerHTML =
-        '<div class="pqc-note">• Analyzer is still loading. Try again in 1-2 seconds.</div>';
-      return;
-    }
 
     const input = readInputValue(activeInput);
     incrementUsageAndCheckLimit(async () => {
       const mode = getMode();
       const serverOutput = await requestServerRewrite("/api/prompt/improve", { text: input, mode });
-      lastRewritten = serverOutput || window.PromptAnalyzer.rewritePrompt(input, mode);
+      lastRewritten = serverOutput || Analyzer.rewritePrompt(input, mode);
       saveHistoryItem({ type: "improve", mode, input, output: lastRewritten });
       analyze();
       panel.querySelector("#pqc-notes").innerHTML =
@@ -381,18 +460,13 @@
   function refine() {
     activeInput = getMainInput();
     if (!activeInput) return;
-    if (!window.PromptAnalyzer) {
-      panel.querySelector("#pqc-notes").innerHTML =
-        '<div class="pqc-note">• Analyzer is still loading. Try again in 1-2 seconds.</div>';
-      return;
-    }
 
     const input = readInputValue(activeInput);
     const context = refineContextFromPanel();
     incrementUsageAndCheckLimit(async () => {
       const mode = getMode();
       const serverOutput = await requestServerRewrite("/api/prompt/refine", { text: input, context, mode });
-      lastRewritten = serverOutput || window.PromptAnalyzer.refinePrompt(input, context, mode);
+      lastRewritten = serverOutput || Analyzer.refinePrompt(input, context, mode);
       saveHistoryItem({ type: "refine", mode, input, output: lastRewritten });
       analyze();
       panel.querySelector("#pqc-notes").innerHTML =
