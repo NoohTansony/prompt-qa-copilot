@@ -1,4 +1,7 @@
 (function () {
+  const WORKER_BASE_URL = "https://prompt-qa-copilot.nooh-tansony.workers.dev";
+  const MODE = "concise";
+
   const Formatter = {
     improve(text) {
       const raw = String(text || "").trim();
@@ -25,6 +28,7 @@
   let miniBtn;
   let activeInput;
   let improvedText = "";
+  let installId = "";
 
   function getInput() {
     const nodes = Array.from(document.querySelectorAll("textarea, div[contenteditable='true']"));
@@ -53,6 +57,39 @@
     el.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
+  function ensureInstallId(cb) {
+    chrome.storage.local.get(["installId"], (data) => {
+      if (data.installId) {
+        installId = data.installId;
+        cb();
+        return;
+      }
+      const created = `pqc_${crypto.randomUUID()}`;
+      chrome.storage.local.set({ installId: created }, () => {
+        installId = created;
+        cb();
+      });
+    });
+  }
+
+  async function improveViaServer(text) {
+    const res = await fetch(`${WORKER_BASE_URL}/api/prompt/improve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: installId, text, mode: MODE }),
+    });
+
+    if (!res.ok) throw new Error(`server ${res.status}`);
+    const data = await res.json();
+    if (!data?.output) throw new Error("empty output");
+    return data.output;
+  }
+
+  function setStatus(msg) {
+    const el = panel?.querySelector("#pqc-status");
+    if (el) el.textContent = msg;
+  }
+
   function renderPanel() {
     panel = document.createElement("div");
     panel.className = "pqc-panel";
@@ -75,29 +112,36 @@
     miniBtn.style.display = "none";
     document.body.appendChild(miniBtn);
 
-    panel.querySelector("#pqc-improve").addEventListener("click", () => {
+    panel.querySelector("#pqc-improve").addEventListener("click", async () => {
       activeInput = getInput();
       if (!activeInput) return;
 
-      improvedText = Formatter.improve(readValue(activeInput));
-      if (!improvedText) {
-        panel.querySelector("#pqc-status").textContent = "Input is empty.";
+      const text = readValue(activeInput);
+      if (!text.trim()) {
+        setStatus("Input is empty.");
         return;
       }
 
-      panel.querySelector("#pqc-status").textContent = "Improved prompt ready. Click Replace.";
+      setStatus("Improving...");
+      try {
+        improvedText = await improveViaServer(text);
+        setStatus("Improved prompt ready (server). Click Replace.");
+      } catch {
+        improvedText = Formatter.improve(text);
+        setStatus("Improved prompt ready (local fallback). Click Replace.");
+      }
     });
 
     panel.querySelector("#pqc-replace").addEventListener("click", () => {
       activeInput = getInput();
       if (!activeInput) return;
       if (!improvedText) {
-        panel.querySelector("#pqc-status").textContent = "Press Improve first.";
+        setStatus("Press Improve first.");
         return;
       }
 
       writeValue(activeInput, improvedText);
-      panel.querySelector("#pqc-status").textContent = "Replaced.";
+      setStatus("Replaced.");
     });
 
     panel.querySelector("#pqc-hide").addEventListener("click", () => {
@@ -116,9 +160,11 @@
     if (!panel) renderPanel();
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
+  ensureInstallId(() => {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", init);
+    } else {
+      init();
+    }
+  });
 })();

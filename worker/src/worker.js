@@ -209,8 +209,11 @@ async function handle(request, env) {
     if (!userId) return json({ ok: false, error: "userId is required" }, 400);
     if (!text.trim()) return json({ ok: false, error: "text is required" }, 400);
 
-    const license = await getLicense(env, userId);
-    if (!license.isActive) return json({ ok: false, error: "pro license required", license }, 402);
+    const requirePro = String(env.REQUIRE_PRO || "false").toLowerCase() === "true";
+    if (requirePro) {
+      const license = await getLicense(env, userId);
+      if (!license.isActive) return json({ ok: false, error: "pro license required", license }, 402);
+    }
 
     const output = await callOpenAI(
       env,
@@ -230,8 +233,11 @@ async function handle(request, env) {
     if (!userId) return json({ ok: false, error: "userId is required" }, 400);
     if (!text.trim()) return json({ ok: false, error: "text is required" }, 400);
 
-    const license = await getLicense(env, userId);
-    if (!license.isActive) return json({ ok: false, error: "pro license required", license }, 402);
+    const requirePro = String(env.REQUIRE_PRO || "false").toLowerCase() === "true";
+    if (requirePro) {
+      const license = await getLicense(env, userId);
+      if (!license.isActive) return json({ ok: false, error: "pro license required", license }, 402);
+    }
 
     const output = await callOpenAI(
       env,
