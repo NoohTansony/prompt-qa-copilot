@@ -2,9 +2,10 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 
-import { addEvent, getLicense, upsertLicense } from "./store.js";
+import { addEvent, getLicense, readStore, upsertLicense } from "./store.js";
 import { mapEventToLicensePatch, parseWebhookPayload, verifyLemonSignature } from "./lemonsqueezy.js";
 import { improveWithAI, refineWithAI } from "./ai.js";
+import { parseImprovePayload, parseRefinePayload } from "./schemas.js";
 
 const app = express();
 const PORT = Number(process.env.PORT || 8787);
@@ -25,8 +26,12 @@ app.get("/api/license/status", (req, res) => {
   res.json({ ok: true, userId, license, upgradeUrl: process.env.LEMON_SQUEEZY_CHECKOUT_URL || null });
 });
 
+function isAdmin(req) {
+  return !!ADMIN_TOKEN && req.headers["x-admin-token"] === ADMIN_TOKEN;
+}
+
 app.post("/api/license/activate", express.json(), (req, res) => {
-  if (!ADMIN_TOKEN || req.headers["x-admin-token"] !== ADMIN_TOKEN) {
+  if (!isAdmin(req)) {
     return res.status(401).json({ ok: false, error: "unauthorized" });
   }
 
@@ -35,6 +40,12 @@ app.post("/api/license/activate", express.json(), (req, res) => {
 
   const next = upsertLicense(String(userId), { plan, isActive, source });
   return res.json({ ok: true, license: next });
+});
+
+app.get("/api/admin/events", (req, res) => {
+  if (!isAdmin(req)) return res.status(401).json({ ok: false, error: "unauthorized" });
+  const db = readStore();
+  return res.json({ ok: true, events: db.events.slice(0, 100) });
 });
 
 app.post("/api/lemonsqueezy/webhook", express.raw({ type: "application/json" }), (req, res) => {
@@ -102,7 +113,8 @@ app.post("/api/prompt/improve", express.json(), async (req, res) => {
   const access = ensureActiveLicense(req, res);
   if (!access) return;
 
-  const { text = "", mode = "concise" } = req.body || {};
+  const { text, mode } = parseImprovePayload(req.body || {});
+  if (!text.trim()) return res.status(400).json({ ok: false, error: "text is required" });
 
   try {
     const output = await improveWithAI({ text, mode });
@@ -116,7 +128,8 @@ app.post("/api/prompt/refine", express.json(), async (req, res) => {
   const access = ensureActiveLicense(req, res);
   if (!access) return;
 
-  const { text = "", context = {}, mode = "concise" } = req.body || {};
+  const { text, context, mode } = parseRefinePayload(req.body || {});
+  if (!text.trim()) return res.status(400).json({ ok: false, error: "text is required" });
 
   try {
     const output = await refineWithAI({ text, context, mode });

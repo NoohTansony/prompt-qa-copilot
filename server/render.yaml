@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: prompt-qa-copilot-server
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: APP_BASE_URL
+        sync: false
+      - key: LEMON_SQUEEZY_WEBHOOK_SECRET
+        sync: false
+      - key: LEMON_SQUEEZY_PRO_VARIANT_IDS
+        sync: false
+      - key: LEMON_SQUEEZY_CHECKOUT_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
+      - key: ADMIN_TOKEN
+        sync: false
