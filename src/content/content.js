@@ -226,13 +226,15 @@
   }
 
   function openUpgrade() {
-    const url = (settings.checkoutUrl || "").trim();
-    if (!url) {
+    const raw = (settings.checkoutUrl || "").trim();
+    if (!raw) {
       panel.querySelector("#pqc-notes").innerHTML =
         '<div class="pqc-note">• No checkout URL set. Add Lemon Squeezy checkout URL in Options.</div>';
       return;
     }
-    window.open(url, "_blank", "noopener,noreferrer");
+
+    const withInstall = raw.replace("{INSTALL_ID}", encodeURIComponent(installId || ""));
+    window.open(withInstall, "_blank", "noopener,noreferrer");
   }
 
   function getOrCreateInstallId(cb) {

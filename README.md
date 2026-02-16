@@ -31,6 +31,11 @@ npm run dev
 Then set `Backend base URL` in extension options (e.g., `http://localhost:8787`).
 
 ## Roadmap
-- Provider API rewrites (OpenAI / Anthropic)
-- Lemon Squeezy licensing
+- Anthropic provider option
 - Team prompt library
+- Better site-specific prompt adapters
+
+## Repo structure
+- `src/` Chrome extension source
+- `server/` Lemon Squeezy + license + AI proxy backend
+- `docs/` setup and product docs
