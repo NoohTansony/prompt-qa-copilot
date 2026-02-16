@@ -37,5 +37,6 @@ Then set `Backend base URL` in extension options (e.g., `http://localhost:8787`)
 
 ## Repo structure
 - `src/` Chrome extension source
-- `server/` Lemon Squeezy + license + AI proxy backend
+- `server/` Node backend (local/dev)
+- `worker/` Cloudflare Worker backend (deploy target)
 - `docs/` setup and product docs
