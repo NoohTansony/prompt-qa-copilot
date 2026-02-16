@@ -5,11 +5,37 @@
   (document.head || document.documentElement).appendChild(script);
 
   const DAILY_FREE_LIMIT = 20;
+  const HISTORY_KEY = "promptHistory";
+  const MAX_HISTORY = 30;
 
   let panel;
   let minBtn;
-  let activeTextarea;
+  let activeInput;
   let lastRewritten = "";
+  let settings = {
+    rewriteMode: "concise",
+    checkoutUrl: "",
+    enabledChatgpt: true,
+    enabledClaude: true,
+    enabledGemini: true,
+    enabledOther: true,
+  };
+
+  function hostType() {
+    const host = location.hostname;
+    if (host.includes("chatgpt.com") || host.includes("chat.openai.com")) return "chatgpt";
+    if (host.includes("claude.ai")) return "claude";
+    if (host.includes("gemini.google.com")) return "gemini";
+    return "other";
+  }
+
+  function isHostEnabled() {
+    const type = hostType();
+    if (type === "chatgpt") return !!settings.enabledChatgpt;
+    if (type === "claude") return !!settings.enabledClaude;
+    if (type === "gemini") return !!settings.enabledGemini;
+    return !!settings.enabledOther;
+  }
 
   function todayKey() {
     return new Date().toISOString().slice(0, 10);
@@ -20,22 +46,15 @@
   }
 
   function getPrimarySelector() {
-    const host = location.hostname;
-    if (host.includes("chatgpt.com") || host.includes("chat.openai.com")) {
-      return "textarea#prompt-textarea, textarea[data-id='root']";
-    }
-    if (host.includes("claude.ai")) {
-      return "div[contenteditable='true'], textarea";
-    }
-    if (host.includes("gemini.google.com")) {
-      return "textarea, div[contenteditable='true']";
-    }
+    const type = hostType();
+    if (type === "chatgpt") return "textarea#prompt-textarea, textarea[data-id='root'], textarea";
+    if (type === "claude") return "div[contenteditable='true'], textarea";
+    if (type === "gemini") return "textarea, div[contenteditable='true']";
     return "textarea, div[contenteditable='true']";
   }
 
   function getMainInput() {
-    const selector = getPrimarySelector();
-    const nodes = Array.from(document.querySelectorAll(selector));
+    const nodes = Array.from(document.querySelectorAll(getPrimarySelector()));
     if (!nodes.length) return null;
     const visible = nodes.filter((n) => n.offsetParent !== null);
     return visible[visible.length - 1] || nodes[0];
@@ -62,7 +81,7 @@
   }
 
   function getMode() {
-    return panel?.querySelector("#pqc-mode")?.value || "concise";
+    return panel?.querySelector("#pqc-mode")?.value || settings.rewriteMode || "concise";
   }
 
   function refineContextFromPanel() {
@@ -72,6 +91,49 @@
       constraints: panel.querySelector("#pqc-constraints")?.value?.trim() || "Be concise, avoid assumptions.",
       outputFormat: panel.querySelector("#pqc-format")?.value?.trim() || "Bullet list with short steps.",
     };
+  }
+
+  function saveHistoryItem(item) {
+    chrome.storage.local.get([HISTORY_KEY], (data) => {
+      const history = Array.isArray(data[HISTORY_KEY]) ? data[HISTORY_KEY] : [];
+      history.unshift({ ...item, ts: Date.now() });
+      chrome.storage.local.set({ [HISTORY_KEY]: history.slice(0, MAX_HISTORY) }, refreshHistoryList);
+    });
+  }
+
+  function refreshHistoryList() {
+    if (!panel) return;
+    const select = panel.querySelector("#pqc-history");
+    if (!select) return;
+
+    chrome.storage.local.get([HISTORY_KEY], (data) => {
+      const history = Array.isArray(data[HISTORY_KEY]) ? data[HISTORY_KEY] : [];
+      select.innerHTML = '<option value="">Recent rewrites...</option>';
+      history.forEach((h, idx) => {
+        const option = document.createElement("option");
+        option.value = String(idx);
+        const label = `${new Date(h.ts).toLocaleTimeString()} · ${h.type}/${h.mode} · ${h.input.slice(0, 36).replace(/\n/g, " ")}`;
+        option.textContent = label;
+        select.appendChild(option);
+      });
+    });
+  }
+
+  function applyHistorySelection() {
+    activeInput = getMainInput();
+    if (!activeInput) return;
+    const select = panel.querySelector("#pqc-history");
+    if (!select || !select.value) return;
+
+    chrome.storage.local.get([HISTORY_KEY], (data) => {
+      const history = Array.isArray(data[HISTORY_KEY]) ? data[HISTORY_KEY] : [];
+      const idx = Number(select.value);
+      const item = history[idx];
+      if (!item?.output) return;
+      lastRewritten = item.output;
+      setInputValue(activeInput, item.output);
+      analyze();
+    });
   }
 
   function createPanel() {
@@ -91,6 +153,13 @@
             <option value="detailed">Detailed</option>
             <option value="coder">Coder</option>
           </select>
+        </div>
+
+        <div class="pqc-row">
+          <select id="pqc-history" class="pqc-select">
+            <option value="">Recent rewrites...</option>
+          </select>
+          <button class="pqc-btn" id="pqc-apply-history">Apply</button>
         </div>
 
         <div class="pqc-refine">
@@ -113,6 +182,7 @@
           <button class="pqc-btn" id="pqc-refine">Refine</button>
           <button class="pqc-btn" id="pqc-copy">Copy</button>
           <button class="pqc-btn" id="pqc-replace">Replace</button>
+          <button class="pqc-btn" id="pqc-upgrade">Upgrade</button>
           <button class="pqc-btn" id="pqc-hide">Hide</button>
         </div>
 
@@ -126,6 +196,8 @@
     minBtn.textContent = "Prompt QA";
     minBtn.style.display = "none";
     document.body.appendChild(minBtn);
+
+    panel.querySelector("#pqc-mode").value = settings.rewriteMode || "concise";
 
     minBtn.addEventListener("click", () => {
       panel.style.display = "block";
@@ -143,15 +215,28 @@
     panel.querySelector("#pqc-copy").addEventListener("click", copyRewritten);
     panel.querySelector("#pqc-replace").addEventListener("click", replaceWithRewritten);
     panel.querySelector("#pqc-mode").addEventListener("change", analyze);
+    panel.querySelector("#pqc-apply-history").addEventListener("click", applyHistorySelection);
+    panel.querySelector("#pqc-upgrade").addEventListener("click", openUpgrade);
 
     updateUsageDisplay();
+    refreshHistoryList();
+  }
+
+  function openUpgrade() {
+    const url = (settings.checkoutUrl || "").trim();
+    if (!url) {
+      panel.querySelector("#pqc-notes").innerHTML =
+        '<div class="pqc-note">• No checkout URL set. Add Lemon Squeezy checkout URL in Options.</div>';
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   function analyze() {
-    activeTextarea = getMainInput();
-    if (!activeTextarea || !window.PromptAnalyzer) return;
+    activeInput = getMainInput();
+    if (!activeInput || !window.PromptAnalyzer) return;
 
-    const result = window.PromptAnalyzer.scorePrompt(readInputValue(activeTextarea));
+    const result = window.PromptAnalyzer.scorePrompt(readInputValue(activeInput));
     panel.querySelector("#pqc-score").textContent = `${result.score}/100`;
 
     const notesEl = panel.querySelector("#pqc-notes");
@@ -169,8 +254,10 @@
     chrome.storage.local.get([key], (data) => {
       const used = Number(data[key] || 0);
       if (used >= DAILY_FREE_LIMIT) {
-        panel.querySelector("#pqc-notes").innerHTML =
-          `<div class="pqc-note">• Daily free limit reached (${DAILY_FREE_LIMIT}). Upgrade hook can be connected next.</div>`;
+        const hasCheckout = !!(settings.checkoutUrl || "").trim();
+        panel.querySelector("#pqc-notes").innerHTML = `<div class="pqc-note">• Daily free limit reached (${DAILY_FREE_LIMIT}). ${
+          hasCheckout ? "Use Upgrade to continue." : "Set checkout URL in Options to connect billing."
+        }</div>`;
         updateUsageDisplay();
         return;
       }
@@ -195,25 +282,28 @@
   }
 
   function improve() {
-    activeTextarea = getMainInput();
-    if (!activeTextarea || !window.PromptAnalyzer) return;
+    activeInput = getMainInput();
+    if (!activeInput || !window.PromptAnalyzer) return;
 
+    const input = readInputValue(activeInput);
     incrementUsageAndCheckLimit(() => {
-      lastRewritten = window.PromptAnalyzer.rewritePrompt(readInputValue(activeTextarea), getMode());
+      const mode = getMode();
+      lastRewritten = window.PromptAnalyzer.rewritePrompt(input, mode);
+      saveHistoryItem({ type: "improve", mode, input, output: lastRewritten });
       analyze();
     });
   }
 
   function refine() {
-    activeTextarea = getMainInput();
-    if (!activeTextarea || !window.PromptAnalyzer) return;
+    activeInput = getMainInput();
+    if (!activeInput || !window.PromptAnalyzer) return;
 
+    const input = readInputValue(activeInput);
+    const context = refineContextFromPanel();
     incrementUsageAndCheckLimit(() => {
-      lastRewritten = window.PromptAnalyzer.refinePrompt(
-        readInputValue(activeTextarea),
-        refineContextFromPanel(),
-        getMode()
-      );
+      const mode = getMode();
+      lastRewritten = window.PromptAnalyzer.refinePrompt(input, context, mode);
+      saveHistoryItem({ type: "refine", mode, input, output: lastRewritten });
       analyze();
     });
   }
@@ -233,34 +323,53 @@
   }
 
   function replaceWithRewritten() {
-    activeTextarea = getMainInput();
-    if (!activeTextarea) return;
+    activeInput = getMainInput();
+    if (!activeInput) return;
 
     if (!lastRewritten) {
       improve();
       return;
     }
 
-    setInputValue(activeTextarea, lastRewritten);
+    setInputValue(activeInput, lastRewritten);
     analyze();
   }
 
+  function loadSettings(cb) {
+    chrome.storage.sync.get(
+      ["rewriteMode", "checkoutUrl", "enabledChatgpt", "enabledClaude", "enabledGemini", "enabledOther"],
+      (data) => {
+        settings = {
+          rewriteMode: data.rewriteMode || "concise",
+          checkoutUrl: data.checkoutUrl || "",
+          enabledChatgpt: data.enabledChatgpt !== false,
+          enabledClaude: data.enabledClaude !== false,
+          enabledGemini: data.enabledGemini !== false,
+          enabledOther: data.enabledOther !== false,
+        };
+        cb();
+      }
+    );
+  }
+
   const init = () => {
-    if (!document.body) return;
+    if (!document.body || !isHostEnabled()) return;
     if (!panel) createPanel();
     analyze();
   };
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
-
-  setInterval(() => {
-    if (panel && panel.style.display !== "none") {
-      analyze();
-      updateUsageDisplay();
+  loadSettings(() => {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", init);
+    } else {
+      init();
     }
-  }, 5000);
+
+    setInterval(() => {
+      if (panel && panel.style.display !== "none") {
+        analyze();
+        updateUsageDisplay();
+      }
+    }, 5000);
+  });
 })();
