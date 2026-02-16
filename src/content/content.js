@@ -276,21 +276,25 @@
   }
 
   async function requestServerRewrite(endpoint, payload) {
-    const base = (settings.backendBaseUrl || "").trim();
-    if (!base || !installId || !(license.isActive || license.plan === "pro")) return null;
+    try {
+      const base = (settings.backendBaseUrl || "").trim();
+      if (!base || !installId || !(license.isActive || license.plan === "pro")) return null;
 
-    const url = `${base.replace(/\/$/, "")}${endpoint}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ ...payload, userId: installId }),
-    });
+      const url = `${base.replace(/\/$/, "")}${endpoint}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ...payload, userId: installId }),
+      });
 
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.output || null;
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data?.output || null;
+    } catch {
+      return null;
+    }
   }
 
   function analyze() {
@@ -355,7 +359,12 @@
 
   function improve() {
     activeInput = getMainInput();
-    if (!activeInput || !window.PromptAnalyzer) return;
+    if (!activeInput) return;
+    if (!window.PromptAnalyzer) {
+      panel.querySelector("#pqc-notes").innerHTML =
+        '<div class="pqc-note">• Analyzer is still loading. Try again in 1-2 seconds.</div>';
+      return;
+    }
 
     const input = readInputValue(activeInput);
     incrementUsageAndCheckLimit(async () => {
@@ -364,12 +373,19 @@
       lastRewritten = serverOutput || window.PromptAnalyzer.rewritePrompt(input, mode);
       saveHistoryItem({ type: "improve", mode, input, output: lastRewritten });
       analyze();
+      panel.querySelector("#pqc-notes").innerHTML =
+        '<div class="pqc-note">• Improved prompt is ready. Click Replace or Copy.</div>';
     });
   }
 
   function refine() {
     activeInput = getMainInput();
-    if (!activeInput || !window.PromptAnalyzer) return;
+    if (!activeInput) return;
+    if (!window.PromptAnalyzer) {
+      panel.querySelector("#pqc-notes").innerHTML =
+        '<div class="pqc-note">• Analyzer is still loading. Try again in 1-2 seconds.</div>';
+      return;
+    }
 
     const input = readInputValue(activeInput);
     const context = refineContextFromPanel();
@@ -379,6 +395,8 @@
       lastRewritten = serverOutput || window.PromptAnalyzer.refinePrompt(input, context, mode);
       saveHistoryItem({ type: "refine", mode, input, output: lastRewritten });
       analyze();
+      panel.querySelector("#pqc-notes").innerHTML =
+        '<div class="pqc-note">• Refined prompt is ready. Click Replace or Copy.</div>';
     });
   }
 
