@@ -27,4 +27,5 @@ npm run dev
 
 - Set `LEMON_SQUEEZY_PRO_VARIANT_IDS` as comma-separated variant IDs to define which purchases map to Pro.
 - If `LEMON_SQUEEZY_PRO_VARIANT_IDS` is empty, paid events are treated as Pro by default.
-- Set `OPENAI_API_KEY` for real AI rewrite calls; otherwise prompt endpoints return errors.
+- Set `MOCK_AI=true` to test without OpenAI keys.
+- Set `OPENAI_API_KEY` and `MOCK_AI=false` for real AI rewrite calls.

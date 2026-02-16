@@ -1,5 +1,40 @@
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const MOCK_AI = String(process.env.MOCK_AI || "").toLowerCase() === "true";
+
+function callMock(type, payload = {}) {
+  const text = String(payload.text || "").trim();
+  if (type === "improve") {
+    return [
+      "[MOCK] Improved Prompt",
+      `mode=${payload.mode || "concise"}`,
+      "",
+      "Task:",
+      text,
+      "",
+      "Constraints:",
+      "- Be accurate",
+      "- Keep it practical",
+      "",
+      "Output format:",
+      "- Summary",
+      "- Action steps",
+    ].join("\n");
+  }
+
+  const ctx = payload.context || {};
+  return [
+    "[MOCK] Refined Prompt",
+    `mode=${payload.mode || "concise"}`,
+    `goal=${ctx.goal || "n/a"}`,
+    `tone=${ctx.tone || "n/a"}`,
+    `constraints=${ctx.constraints || "n/a"}`,
+    `output=${ctx.outputFormat || "n/a"}`,
+    "",
+    "Task:",
+    text,
+  ].join("\n");
+}
 
 function ensureApiKey() {
   if (!OPENAI_API_KEY) {
@@ -10,6 +45,10 @@ function ensureApiKey() {
 }
 
 async function callOpenAI(systemPrompt, userPrompt) {
+  if (MOCK_AI) {
+    return "[MOCK] OpenAI call bypassed";
+  }
+
   ensureApiKey();
 
   const body = {
@@ -43,6 +82,8 @@ async function callOpenAI(systemPrompt, userPrompt) {
 }
 
 export async function improveWithAI({ text, mode }) {
+  if (MOCK_AI) return callMock("improve", { text, mode });
+
   const system = [
     "You are Prompt QA Copilot.",
     "Rewrite user text into a high-quality AI prompt.",
@@ -60,6 +101,8 @@ export async function improveWithAI({ text, mode }) {
 }
 
 export async function refineWithAI({ text, mode, context = {} }) {
+  if (MOCK_AI) return callMock("refine", { text, mode, context });
+
   const system = [
     "You are Prompt QA Copilot.",
     "Refine user text into a highly specific, execution-ready AI prompt.",
