@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Prompt QA Copilot",
+  "description": "Grammarly-style helper for AI prompts.",
+  "version": "0.1.0",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "<all_urls>"
+  ],
+  "action": {
+    "default_title": "Prompt QA Copilot",
+    "default_popup": "src/popup/popup.html"
+  },
+  "options_page": "src/options/options.html",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/content.js"],
+      "css": ["src/content/content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
