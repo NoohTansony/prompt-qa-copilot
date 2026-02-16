@@ -1,6 +1,7 @@
 const modeEl = document.getElementById("mode");
 const checkoutUrlEl = document.getElementById("checkoutUrl");
 const apiKeyEl = document.getElementById("apiKey");
+const backendBaseUrlEl = document.getElementById("backendBaseUrl");
 const statusEl = document.getElementById("status");
 
 const enabledChatgptEl = document.getElementById("enabledChatgpt");
@@ -17,11 +18,13 @@ chrome.storage.sync.get(
     "enabledClaude",
     "enabledGemini",
     "enabledOther",
+    "backendBaseUrl",
   ],
   (data) => {
     modeEl.value = data.rewriteMode || "concise";
     apiKeyEl.value = data.openaiApiKey || "";
     checkoutUrlEl.value = data.checkoutUrl || "";
+    backendBaseUrlEl.value = data.backendBaseUrl || "";
 
     enabledChatgptEl.checked = data.enabledChatgpt !== false;
     enabledClaudeEl.checked = data.enabledClaude !== false;
@@ -40,6 +43,7 @@ document.getElementById("save").addEventListener("click", () => {
       enabledClaude: enabledClaudeEl.checked,
       enabledGemini: enabledGeminiEl.checked,
       enabledOther: enabledOtherEl.checked,
+      backendBaseUrl: backendBaseUrlEl.value.trim(),
     },
     () => {
       statusEl.textContent = "Saved.";

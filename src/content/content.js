@@ -15,11 +15,14 @@
   let settings = {
     rewriteMode: "concise",
     checkoutUrl: "",
+    backendBaseUrl: "",
     enabledChatgpt: true,
     enabledClaude: true,
     enabledGemini: true,
     enabledOther: true,
   };
+  let installId = "";
+  let license = { isActive: false, plan: "free" };
 
   function hostType() {
     const host = location.hostname;
@@ -232,6 +235,41 @@
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
+  function getOrCreateInstallId(cb) {
+    chrome.storage.local.get(["installId"], (data) => {
+      if (data.installId) {
+        installId = data.installId;
+        cb(installId);
+        return;
+      }
+      const created = `pqc_${crypto.randomUUID()}`;
+      chrome.storage.local.set({ installId: created }, () => {
+        installId = created;
+        cb(created);
+      });
+    });
+  }
+
+  function refreshLicenseStatus() {
+    const base = (settings.backendBaseUrl || "").trim();
+    if (!base || !installId) return;
+
+    fetch(`${base.replace(/\/$/, "")}/api/license/status?userId=${encodeURIComponent(installId)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("license status failed"))))
+      .then((data) => {
+        if (data?.license) {
+          license = {
+            isActive: !!data.license.isActive,
+            plan: data.license.plan || (data.license.isActive ? "pro" : "free"),
+          };
+          updateUsageDisplay();
+        }
+      })
+      .catch(() => {
+        // silent - fallback to free mode
+      });
+  }
+
   function analyze() {
     activeInput = getMainInput();
     if (!activeInput || !window.PromptAnalyzer) return;
@@ -250,6 +288,11 @@
   }
 
   function incrementUsageAndCheckLimit(onAllowed) {
+    if (license.isActive || license.plan === "pro") {
+      onAllowed();
+      return;
+    }
+
     const key = usageKey();
     chrome.storage.local.get([key], (data) => {
       const used = Number(data[key] || 0);
@@ -277,7 +320,13 @@
       const left = Math.max(0, DAILY_FREE_LIMIT - used);
       const el = panel?.querySelector("#pqc-usage");
       if (!el) return;
-      el.innerHTML = `Daily free usage: <span class="pqc-usage-strong">${used}/${DAILY_FREE_LIMIT}</span> · left ${left}`;
+
+      if (license.isActive || license.plan === "pro") {
+        el.innerHTML = `Plan: <span class="pqc-usage-strong">PRO</span> · unlimited`;
+        return;
+      }
+
+      el.innerHTML = `Plan: Free · Daily usage: <span class="pqc-usage-strong">${used}/${DAILY_FREE_LIMIT}</span> · left ${left}`;
     });
   }
 
@@ -337,11 +386,12 @@
 
   function loadSettings(cb) {
     chrome.storage.sync.get(
-      ["rewriteMode", "checkoutUrl", "enabledChatgpt", "enabledClaude", "enabledGemini", "enabledOther"],
+      ["rewriteMode", "checkoutUrl", "backendBaseUrl", "enabledChatgpt", "enabledClaude", "enabledGemini", "enabledOther"],
       (data) => {
         settings = {
           rewriteMode: data.rewriteMode || "concise",
           checkoutUrl: data.checkoutUrl || "",
+          backendBaseUrl: data.backendBaseUrl || "",
           enabledChatgpt: data.enabledChatgpt !== false,
           enabledClaude: data.enabledClaude !== false,
           enabledGemini: data.enabledGemini !== false,
@@ -359,17 +409,23 @@
   };
 
   loadSettings(() => {
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", init);
-    } else {
-      init();
-    }
+    getOrCreateInstallId(() => {
+      refreshLicenseStatus();
 
-    setInterval(() => {
-      if (panel && panel.style.display !== "none") {
-        analyze();
-        updateUsageDisplay();
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+      } else {
+        init();
       }
-    }, 5000);
+
+      setInterval(() => {
+        if (panel && panel.style.display !== "none") {
+          analyze();
+          updateUsageDisplay();
+        }
+      }, 5000);
+
+      setInterval(refreshLicenseStatus, 60000);
+    });
   });
 })();
