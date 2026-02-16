@@ -22,5 +22,11 @@
       "css": ["src/content/content.css"],
       "run_at": "document_idle"
     }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/core/promptAnalyzer.js"],
+      "matches": ["<all_urls>"]
+    }
   ]
 }
