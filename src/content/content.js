@@ -262,12 +262,33 @@
             isActive: !!data.license.isActive,
             plan: data.license.plan || (data.license.isActive ? "pro" : "free"),
           };
-          updateUsageDisplay();
         }
+        if (data?.upgradeUrl && !settings.checkoutUrl) {
+          settings.checkoutUrl = data.upgradeUrl;
+        }
+        updateUsageDisplay();
       })
       .catch(() => {
         // silent - fallback to free mode
       });
+  }
+
+  async function requestServerRewrite(endpoint, payload) {
+    const base = (settings.backendBaseUrl || "").trim();
+    if (!base || !installId || !(license.isActive || license.plan === "pro")) return null;
+
+    const url = `${base.replace(/\/$/, "")}${endpoint}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ...payload, userId: installId }),
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.output || null;
   }
 
   function analyze() {
@@ -335,9 +356,10 @@
     if (!activeInput || !window.PromptAnalyzer) return;
 
     const input = readInputValue(activeInput);
-    incrementUsageAndCheckLimit(() => {
+    incrementUsageAndCheckLimit(async () => {
       const mode = getMode();
-      lastRewritten = window.PromptAnalyzer.rewritePrompt(input, mode);
+      const serverOutput = await requestServerRewrite("/api/prompt/improve", { text: input, mode });
+      lastRewritten = serverOutput || window.PromptAnalyzer.rewritePrompt(input, mode);
       saveHistoryItem({ type: "improve", mode, input, output: lastRewritten });
       analyze();
     });
@@ -349,9 +371,10 @@
 
     const input = readInputValue(activeInput);
     const context = refineContextFromPanel();
-    incrementUsageAndCheckLimit(() => {
+    incrementUsageAndCheckLimit(async () => {
       const mode = getMode();
-      lastRewritten = window.PromptAnalyzer.refinePrompt(input, context, mode);
+      const serverOutput = await requestServerRewrite("/api/prompt/refine", { text: input, context, mode });
+      lastRewritten = serverOutput || window.PromptAnalyzer.refinePrompt(input, context, mode);
       saveHistoryItem({ type: "refine", mode, input, output: lastRewritten });
       analyze();
     });
