@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  server-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install server deps
+        run: npm ci
+        working-directory: server
+      - name: Start server
+        run: |
+          npm start &
+          sleep 2
+          curl -f http://127.0.0.1:8787/health
+        working-directory: server
+
+  package-extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build extension zip
+        run: |
+          mkdir -p dist
+          zip -r dist/prompt-qa-copilot-extension.zip manifest.json src -x "*.DS_Store"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-zip
+          path: dist/prompt-qa-copilot-extension.zip
