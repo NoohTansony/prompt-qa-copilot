@@ -1,9 +1,9 @@
 # Prompt QA Copilot Server
 
-Minimal backend for:
+Backend for:
 - Lemon Squeezy webhook verification
 - License status lookup
-- Optional AI rewrite proxy endpoints
+- Pro-gated AI rewrite/refine endpoints
 
 ## Run
 
@@ -20,5 +20,11 @@ npm run dev
 - `GET /api/license/status?userId=<id>`
 - `POST /api/license/activate` (admin token protected)
 - `POST /api/lemonsqueezy/webhook` (signature verified)
-- `POST /api/prompt/improve` (stub)
-- `POST /api/prompt/refine` (stub)
+- `POST /api/prompt/improve` (Pro only)
+- `POST /api/prompt/refine` (Pro only)
+
+## Notes
+
+- Set `LEMON_SQUEEZY_PRO_VARIANT_IDS` as comma-separated variant IDs to define which purchases map to Pro.
+- If `LEMON_SQUEEZY_PRO_VARIANT_IDS` is empty, paid events are treated as Pro by default.
+- Set `OPENAI_API_KEY` for real AI rewrite calls; otherwise prompt endpoints return errors.
