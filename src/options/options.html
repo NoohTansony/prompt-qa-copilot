@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Prompt QA Copilot Settings</title>
+    <style>
+      body { font-family: Inter, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+      input, select { width: 100%; padding: 8px; margin-top: 6px; margin-bottom: 14px; }
+      button { padding: 8px 12px; }
+      .ok { color: green; }
+    </style>
+  </head>
+  <body>
+    <h1>Prompt QA Copilot Settings</h1>
+    <label>Default rewrite mode</label>
+    <select id="mode">
+      <option value="concise">Concise</option>
+      <option value="detailed">Detailed</option>
+      <option value="coder">Coder</option>
+    </select>
+
+    <label>OpenAI API Key (optional, for future server rewrite)</label>
+    <input id="apiKey" type="password" placeholder="sk-..." />
+
+    <button id="save">Save</button>
+    <p id="status"></p>
+
+    <script src="options.js"></script>
+  </body>
+</html>

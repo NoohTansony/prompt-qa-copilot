@@ -1,0 +1,41 @@
+.pqc-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 320px;
+  z-index: 999999;
+  background: #111827;
+  color: #f9fafb;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.pqc-header { padding: 10px 12px; font-weight: 600; border-bottom: 1px solid #374151; }
+.pqc-body { padding: 10px 12px; font-size: 13px; }
+.pqc-score { font-size: 22px; font-weight: 700; margin: 6px 0; }
+.pqc-actions { display: flex; gap: 8px; margin-top: 10px; }
+.pqc-btn {
+  border: 1px solid #4b5563;
+  background: #1f2937;
+  color: #f9fafb;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.pqc-btn:hover { background: #374151; }
+.pqc-note { color: #d1d5db; margin: 4px 0; }
+.pqc-min {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 999999;
+  background: #111827;
+  color: #fff;
+  border: 1px solid #374151;
+  border-radius: 999px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
