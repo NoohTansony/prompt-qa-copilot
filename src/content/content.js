@@ -7,12 +7,17 @@
   let panel;
   let minBtn;
   let activeTextarea;
+  let lastRewritten = "";
 
   function getMainTextarea() {
     const textareas = Array.from(document.querySelectorAll("textarea"));
     if (!textareas.length) return null;
     const visible = textareas.filter((t) => t.offsetParent !== null);
     return visible[visible.length - 1] || textareas[0];
+  }
+
+  function getMode() {
+    return panel?.querySelector("#pqc-mode")?.value || "concise";
   }
 
   function createPanel() {
@@ -24,9 +29,22 @@
         <div>Score</div>
         <div class="pqc-score" id="pqc-score">--</div>
         <div id="pqc-notes"></div>
+
+        <div class="pqc-row">
+          <span>Mode</span>
+          <select id="pqc-mode" class="pqc-select">
+            <option value="concise">Concise</option>
+            <option value="detailed">Detailed</option>
+            <option value="coder">Coder</option>
+          </select>
+        </div>
+
         <div class="pqc-actions">
           <button class="pqc-btn" id="pqc-refresh">Analyze</button>
-          <button class="pqc-btn" id="pqc-rewrite">Rewrite</button>
+          <button class="pqc-btn" id="pqc-improve">Improve</button>
+          <button class="pqc-btn" id="pqc-refine">Refine</button>
+          <button class="pqc-btn" id="pqc-copy">Copy</button>
+          <button class="pqc-btn" id="pqc-replace">Replace</button>
           <button class="pqc-btn" id="pqc-hide">Hide</button>
         </div>
       </div>
@@ -50,7 +68,11 @@
     });
 
     panel.querySelector("#pqc-refresh").addEventListener("click", analyze);
-    panel.querySelector("#pqc-rewrite").addEventListener("click", rewrite);
+    panel.querySelector("#pqc-improve").addEventListener("click", improve);
+    panel.querySelector("#pqc-refine").addEventListener("click", refine);
+    panel.querySelector("#pqc-copy").addEventListener("click", copyRewritten);
+    panel.querySelector("#pqc-replace").addEventListener("click", replaceWithRewritten);
+    panel.querySelector("#pqc-mode").addEventListener("change", analyze);
   }
 
   function analyze() {
@@ -70,12 +92,62 @@
     });
   }
 
-  function rewrite() {
+  function improve() {
     activeTextarea = getMainTextarea();
     if (!activeTextarea || !window.PromptAnalyzer) return;
 
-    const rewritten = window.PromptAnalyzer.rewritePrompt(activeTextarea.value, "concise");
-    activeTextarea.value = rewritten;
+    lastRewritten = window.PromptAnalyzer.rewritePrompt(activeTextarea.value, getMode());
+    analyze();
+  }
+
+  function askRefineContext() {
+    const goal = window.prompt("Refine: What is the primary goal?", "Produce a practical, useful answer.");
+    if (goal === null) return null;
+    const tone = window.prompt("Refine: Desired tone?", "Clear and professional.");
+    if (tone === null) return null;
+    const constraints = window.prompt("Refine: Any constraints?", "Be concise, avoid assumptions.");
+    if (constraints === null) return null;
+    const outputFormat = window.prompt("Refine: Output format?", "Bullet list with short steps.");
+    if (outputFormat === null) return null;
+
+    return { goal, tone, constraints, outputFormat };
+  }
+
+  function refine() {
+    activeTextarea = getMainTextarea();
+    if (!activeTextarea || !window.PromptAnalyzer) return;
+
+    const context = askRefineContext();
+    if (!context) return;
+
+    lastRewritten = window.PromptAnalyzer.refinePrompt(activeTextarea.value, context, getMode());
+    analyze();
+  }
+
+  async function copyRewritten() {
+    if (!lastRewritten) {
+      improve();
+    }
+    if (!lastRewritten) return;
+
+    try {
+      await navigator.clipboard.writeText(lastRewritten);
+      panel.querySelector("#pqc-notes").innerHTML = '<div class="pqc-note">• Rewritten prompt copied.</div>';
+    } catch {
+      panel.querySelector("#pqc-notes").innerHTML = '<div class="pqc-note">• Copy failed. Clipboard permission may be blocked.</div>';
+    }
+  }
+
+  function replaceWithRewritten() {
+    activeTextarea = getMainTextarea();
+    if (!activeTextarea) return;
+
+    if (!lastRewritten) {
+      improve();
+    }
+    if (!lastRewritten) return;
+
+    activeTextarea.value = lastRewritten;
     activeTextarea.dispatchEvent(new Event("input", { bubbles: true }));
     analyze();
   }

@@ -35,19 +35,18 @@ function scorePrompt(text) {
   return { score, missing, notes };
 }
 
+function modePrefix(mode = "concise") {
+  if (mode === "coder") return "You are a senior software engineer.";
+  if (mode === "detailed") return "You are an expert assistant. Think step by step and be explicit.";
+  return "You are a helpful assistant.";
+}
+
 function rewritePrompt(text, mode = "concise") {
   const trimmed = (text || "").trim();
   if (!trimmed) return "";
 
-  const prefix =
-    mode === "coder"
-      ? "You are a senior software engineer."
-      : mode === "detailed"
-      ? "You are an expert assistant. Think step by step and be explicit."
-      : "You are a helpful assistant.";
-
   return [
-    prefix,
+    modePrefix(mode),
     "",
     "Task:",
     trimmed,
@@ -64,4 +63,38 @@ function rewritePrompt(text, mode = "concise") {
   ].join("\n");
 }
 
-window.PromptAnalyzer = { scorePrompt, rewritePrompt };
+function refinePrompt(text, context = {}, mode = "concise") {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return "";
+
+  const goal = context.goal || "Complete the user's request accurately.";
+  const tone = context.tone || "Clear and professional";
+  const constraints = context.constraints || "No hallucinations. Be explicit when uncertain.";
+  const outputFormat = context.outputFormat || "Bullet list with concise steps.";
+
+  return [
+    modePrefix(mode),
+    "",
+    "Primary Goal:",
+    goal,
+    "",
+    "User Input:",
+    trimmed,
+    "",
+    "Tone:",
+    tone,
+    "",
+    "Constraints:",
+    constraints,
+    "",
+    "Required Output Format:",
+    outputFormat,
+    "",
+    "Quality bar:",
+    "- Be specific and actionable.",
+    "- Keep structure tidy and easy to scan.",
+    "- Avoid filler.",
+  ].join("\n");
+}
+
+window.PromptAnalyzer = { scorePrompt, rewritePrompt, refinePrompt };
