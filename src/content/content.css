@@ -2,7 +2,7 @@
   position: fixed;
   right: 16px;
   bottom: 16px;
-  width: 340px;
+  width: 360px;
   z-index: 999999;
   background: #111827;
   color: #f9fafb;
@@ -40,12 +40,35 @@
   font-size: 12px;
 }
 .pqc-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
-.pqc-select {
+.pqc-select,
+.pqc-input,
+.pqc-textarea {
   border: 1px solid #4b5563;
   background: #111827;
   color: #f9fafb;
   border-radius: 8px;
-  padding: 5px 7px;
+  padding: 6px 7px;
   font-size: 12px;
-  flex: 1;
+  width: 100%;
 }
+.pqc-select { flex: 1; }
+.pqc-refine {
+  margin-top: 10px;
+  border: 1px solid #374151;
+  border-radius: 10px;
+  padding: 8px;
+  background: #0f172a;
+}
+.pqc-label {
+  display: block;
+  margin: 6px 0 4px;
+  color: #cbd5e1;
+  font-size: 11px;
+}
+.pqc-textarea { min-height: 48px; resize: vertical; }
+.pqc-usage {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #cbd5e1;
+}
+.pqc-usage-strong { color: #fef08a; font-weight: 600; }
