@@ -118,6 +118,25 @@ async function addEvent(env, event) {
   });
 }
 
+function localFallbackPrompt(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return "";
+  return [
+    "You are a practical assistant.",
+    "",
+    "Task:",
+    raw,
+    "",
+    "Rules:",
+    "- Be accurate and concise.",
+    "- If critical info is missing, ask only necessary questions.",
+    "",
+    "Output format:",
+    "1) Short answer",
+    "2) Actionable steps",
+  ].join("\n");
+}
+
 async function callOpenAI(env, systemPrompt, userPrompt) {
   if (String(env.MOCK_AI || "false").toLowerCase() === "true") {
     return `[MOCK] ${userPrompt.slice(0, 600)}`;
@@ -215,13 +234,17 @@ async function handle(request, env) {
       if (!license.isActive) return json({ ok: false, error: "pro license required", license }, 402);
     }
 
-    const output = await callOpenAI(
-      env,
-      "You are Prompt QA Copilot. Rewrite user text into a high-quality AI prompt. Keep intent unchanged. Return only the rewritten prompt.",
-      `Mode: ${mode}\nText:\n${text}`
-    );
-
-    return json({ ok: true, output, model: env.OPENAI_MODEL || "gpt-4.1-mini" });
+    try {
+      const output = await callOpenAI(
+        env,
+        "You are Prompt QA Copilot. Rewrite user text into a high-quality AI prompt. Keep intent unchanged. Return only the rewritten prompt.",
+        `Mode: ${mode}\nText:\n${text}`
+      );
+      return json({ ok: true, output, model: env.OPENAI_MODEL || "gpt-4.1-mini", source: "openai" });
+    } catch (err) {
+      const output = localFallbackPrompt(text);
+      return json({ ok: true, output, source: "local-fallback", warning: err.message || "openai_failed" });
+    }
   }
 
   if (pathname === "/api/prompt/refine" && request.method === "POST") {
@@ -239,13 +262,17 @@ async function handle(request, env) {
       if (!license.isActive) return json({ ok: false, error: "pro license required", license }, 402);
     }
 
-    const output = await callOpenAI(
-      env,
-      "You are Prompt QA Copilot. Refine user text into a highly specific, execution-ready AI prompt. Use context fields and return only the refined prompt.",
-      `Mode: ${mode}\nGoal: ${ctx.goal || "n/a"}\nTone: ${ctx.tone || "n/a"}\nConstraints: ${ctx.constraints || "n/a"}\nOutput format: ${ctx.outputFormat || "n/a"}\n\nText:\n${text}`
-    );
-
-    return json({ ok: true, output, model: env.OPENAI_MODEL || "gpt-4.1-mini" });
+    try {
+      const output = await callOpenAI(
+        env,
+        "You are Prompt QA Copilot. Refine user text into a highly specific, execution-ready AI prompt. Use context fields and return only the refined prompt.",
+        `Mode: ${mode}\nGoal: ${ctx.goal || "n/a"}\nTone: ${ctx.tone || "n/a"}\nConstraints: ${ctx.constraints || "n/a"}\nOutput format: ${ctx.outputFormat || "n/a"}\n\nText:\n${text}`
+      );
+      return json({ ok: true, output, model: env.OPENAI_MODEL || "gpt-4.1-mini", source: "openai" });
+    } catch (err) {
+      const output = localFallbackPrompt(text);
+      return json({ ok: true, output, source: "local-fallback", warning: err.message || "openai_failed" });
+    }
   }
 
   return json({ ok: false, error: "not found" }, 404);
