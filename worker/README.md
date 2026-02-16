@@ -34,8 +34,10 @@ npx wrangler deploy
 
 ## 5) Endpoints
 - `GET /health`
+- `GET /api/diag`
 - `GET /api/license/status?userId=...`
 - `POST /api/license/activate` (x-admin-token)
+- `GET /api/admin/openai-probe` (x-admin-token)
 - `POST /api/lemonsqueezy/webhook`
 - `POST /api/prompt/improve`
 - `POST /api/prompt/refine`

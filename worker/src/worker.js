@@ -144,7 +144,13 @@ async function callOpenAI(env, systemPrompt, userPrompt) {
 
   if (!env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
-  const body = {
+  const headers = {
+    Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+    "Content-Type": "application/json",
+  };
+
+  // Try Responses API first
+  const responsesBody = {
     model: env.OPENAI_MODEL || "gpt-4.1-mini",
     input: [
       { role: "system", content: [{ type: "input_text", text: systemPrompt }] },
@@ -153,18 +159,42 @@ async function callOpenAI(env, systemPrompt, userPrompt) {
     temperature: 0.4,
   };
 
-  const res = await fetch("https://api.openai.com/v1/responses", {
+  let res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
+    headers,
+    body: JSON.stringify(responsesBody),
   });
 
-  if (!res.ok) throw new Error(`OpenAI error ${res.status}: ${await res.text()}`);
-  const data = await res.json();
-  return String(data?.output_text || "").trim();
+  if (res.ok) {
+    const data = await res.json();
+    return String(data?.output_text || "").trim();
+  }
+
+  const firstError = await res.text();
+
+  // Fallback to Chat Completions API
+  const chatBody = {
+    model: env.OPENAI_MODEL || "gpt-4.1-mini",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.4,
+  };
+
+  res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(chatBody),
+  });
+
+  if (res.ok) {
+    const data = await res.json();
+    return String(data?.choices?.[0]?.message?.content || "").trim();
+  }
+
+  const secondError = await res.text();
+  throw new Error(`OpenAI responses failed: ${firstError} | chat.completions failed: ${secondError}`);
 }
 
 function requireAdmin(request, env) {
@@ -177,6 +207,22 @@ async function handle(request, env) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
   if (pathname === "/health") return json({ ok: true, service: "prompt-qa-copilot-worker", time: new Date().toISOString() });
+
+  if (pathname === "/api/diag" && request.method === "GET") {
+    return json({
+      ok: true,
+      cf: request.cf ? {
+        colo: request.cf.colo,
+        country: request.cf.country,
+        regionCode: request.cf.regionCode,
+        city: request.cf.city,
+        asn: request.cf.asn,
+      } : null,
+      mockAi: String(env.MOCK_AI || "false"),
+      requirePro: String(env.REQUIRE_PRO || "false"),
+      model: env.OPENAI_MODEL || null,
+    });
+  }
 
   if (pathname === "/api/license/status" && request.method === "GET") {
     const userId = String(searchParams.get("userId") || "").trim();
@@ -198,6 +244,16 @@ async function handle(request, env) {
       source: body.source || "manual",
     });
     return json({ ok: true, license: next });
+  }
+
+  if (pathname === "/api/admin/openai-probe" && request.method === "GET") {
+    if (!requireAdmin(request, env)) return json({ ok: false, error: "unauthorized" }, 401);
+    try {
+      const output = await callOpenAI(env, "Return exactly: OK", "Ping");
+      return json({ ok: true, output, source: "openai" });
+    } catch (err) {
+      return json({ ok: false, error: err.message || "probe_failed" }, 500);
+    }
   }
 
   if (pathname === "/api/lemonsqueezy/webhook" && request.method === "POST") {
