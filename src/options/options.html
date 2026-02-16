@@ -4,23 +4,44 @@
     <meta charset="UTF-8" />
     <title>Prompt QA Copilot Settings</title>
     <style>
-      body { font-family: Inter, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+      body { font-family: Inter, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; }
       input, select { width: 100%; padding: 8px; margin-top: 6px; margin-bottom: 14px; }
       button { padding: 8px 12px; }
       .ok { color: green; }
+      .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; margin: 14px 0; }
+      .check { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+      .check input { width: auto; margin: 0; }
+      .muted { color: #666; font-size: 12px; }
     </style>
   </head>
   <body>
     <h1>Prompt QA Copilot Settings</h1>
-    <label>Default rewrite mode</label>
-    <select id="mode">
-      <option value="concise">Concise</option>
-      <option value="detailed">Detailed</option>
-      <option value="coder">Coder</option>
-    </select>
 
-    <label>OpenAI API Key (optional, for future server rewrite)</label>
-    <input id="apiKey" type="password" placeholder="sk-..." />
+    <div class="card">
+      <label>Default rewrite mode</label>
+      <select id="mode">
+        <option value="concise">Concise</option>
+        <option value="detailed">Detailed</option>
+        <option value="coder">Coder</option>
+      </select>
+
+      <label>Lemon Squeezy Checkout URL (for Upgrade button)</label>
+      <input id="checkoutUrl" type="url" placeholder="https://..." />
+      <div class="muted">Paste your hosted checkout URL. This opens when free limits are reached.</div>
+    </div>
+
+    <div class="card">
+      <h3>Enable on sites</h3>
+      <label class="check"><input id="enabledChatgpt" type="checkbox" /> ChatGPT</label>
+      <label class="check"><input id="enabledClaude" type="checkbox" /> Claude</label>
+      <label class="check"><input id="enabledGemini" type="checkbox" /> Gemini</label>
+      <label class="check"><input id="enabledOther" type="checkbox" /> Other sites</label>
+    </div>
+
+    <div class="card">
+      <label>OpenAI API Key (optional, for future server rewrite)</label>
+      <input id="apiKey" type="password" placeholder="sk-..." />
+    </div>
 
     <button id="save">Save</button>
     <p id="status"></p>
