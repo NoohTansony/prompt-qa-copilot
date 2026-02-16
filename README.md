@@ -12,12 +12,23 @@ Prompt-focused writing assistant for AI chats.
 - Manifest V3
 - Vanilla JS + CSS
 - Content script UI injection
+- Node.js backend (Express) for Lemon Squeezy + license status
 
 ## Local test
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
 3. **Load unpacked** this folder
 4. Open ChatGPT (or any page with a textarea)
+
+## Backend (license + webhooks)
+```bash
+cd server
+cp .env.example .env
+npm install
+npm run dev
+```
+
+Then set `Backend base URL` in extension options (e.g., `http://localhost:8787`).
 
 ## Roadmap
 - Provider API rewrites (OpenAI / Anthropic)
